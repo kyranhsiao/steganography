@@ -1,10 +1,13 @@
 import numpy as np
+import logging
+logger = logging.getLogger(__name__)
 
 def lsbr_rand_embed(
     cover: np.ndarray,
     msg_bits: str,
     seed: int
 ) -> np.ndarray:
+    logger.debug(f'Start to do LSBR random embedding (seed = {seed})...')
     if cover.ndim != 2:
         raise ValueError(f'Input cover must be 2D array, but got shape {cover.shape}')
     stego_flatten = cover.flatten()
@@ -17,15 +20,17 @@ def lsbr_rand_embed(
     indices = rng.choice(num_pixels, size=len(msg_bits), replace=False) # `replace=False` 要求每个索引只能选择一次
     for idx, bit in zip(indices, msg_bits):
         stego_flatten[idx] = (stego_flatten[idx] & 0b11111110) | int(bit)
-    stego = stego_flatten.view(cover.shape)
-    
+        logger.debug(f'Message bit index = {idx}, replace the LSB with {bit}')
+    stego = stego_flatten.reshape(cover.shape)
+    logger.debug('LSBR random embedding is done')
     return stego
 
-def lbsr_rand_extract(
+def lsbr_rand_extract(
     stego: np.ndarray,
     bit_length: int,
     seed: int
 ) -> str:
+    logger.debug(f'Start to do LSBR random extraction (seed = {seed})...')
     stego_flatten = stego.flatten()
     num_pixels = stego_flatten.shape[0]
     
@@ -36,5 +41,7 @@ def lbsr_rand_extract(
     for idx in indices:
         bit = stego_flatten[idx] & 0b00000001
         extract_bits.append(str(bit))
+        logger.debug(f'Pixel index = {idx}, get the LSB = {bit}')
         
+    logger.debug('LSBR random extraction is done')   
     return ''.join(extract_bits)
