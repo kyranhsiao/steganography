@@ -1,14 +1,38 @@
 import numpy as np
-from utils.data import generate_random_indices
+from utils.data import generate_random_indices, generate_udistribution
 import logging
 logger = logging.getLogger(__name__)
 
-def lsbr_rand_embed(
+
+def do_embedding(
+    pixel: np.uint8, 
+    bit: str, 
+    prob: float
+) -> np.uint8:
+    bit = int(bit)
+    pixel = int(pixel)  # convert to Python int to avoid overflow
+    lsb = pixel % 2
+
+    if lsb == bit:
+        return np.uint8(pixel)
+
+    delta = 1 if prob >= 0.5 else -1
+
+    if pixel == 0 and delta == -1:
+        pixel += 1
+    elif pixel == 255 and delta == 1:
+        pixel -= 1
+    else:
+        pixel += delta
+
+    return np.uint8(pixel)
+
+def lsbm_rand_embed(
     cover: np.ndarray,
     msg_bits: str,
     seed: int
 ) -> np.ndarray:
-    logger.debug(f'Start to do LSBR random embedding (seed = {seed})...')
+    logger.debug(f'Start to do LSBM random embedding (seed = {seed})...')
     if cover.ndim != 2:
         raise ValueError(f'Input cover must be 2D array, but got shape {cover.shape}')
     stego_flatten = cover.flatten()
@@ -18,19 +42,22 @@ def lsbr_rand_embed(
     
     # 使用随机种子生成嵌入的像素点索引
     indices = generate_random_indices(num_pixels, len(msg_bits), seed)
-    for idx, bit in zip(indices, msg_bits):
-        stego_flatten[idx] = (stego_flatten[idx] & 0b11111110) | int(bit)
-        logger.debug(f'Message bit index = {idx}, replace the LSB with {bit}')
+    probs = generate_udistribution(len(msg_bits), seed)
+    for idx, bit, prob in zip(indices, msg_bits, probs):
+        new_pixel = do_embedding(stego_flatten[idx], bit, prob)
+        logger.debug(f'Message bit index = {idx}, make pixel {stego_flatten[idx]} to {new_pixel}')
+        stego_flatten[idx] = new_pixel
+
     stego = stego_flatten.reshape(cover.shape)
-    logger.debug('LSBR random embedding is done')
+    logger.debug('LSBM random embedding is done')
     return stego
 
-def lsbr_rand_extract(
+def lsbm_rand_extract(
     stego: np.ndarray,
     bit_length: int,
     seed: int
 ) -> str:
-    logger.debug(f'Start to do LSBR random extraction (seed = {seed})...')
+    logger.debug(f'Start to do LSBM random extraction (seed = {seed})...')
     stego_flatten = stego.flatten()
     num_pixels = stego_flatten.shape[0]
     
@@ -42,5 +69,5 @@ def lsbr_rand_extract(
         extract_bits.append(str(bit))
         logger.debug(f'Pixel index = {idx}, get the LSB = {bit}')
         
-    logger.debug('LSBR random extraction is done')   
+    logger.debug('LSBM random extraction is done')   
     return ''.join(extract_bits)
